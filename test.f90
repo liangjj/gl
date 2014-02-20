@@ -1,0 +1,25 @@
+!MODULE sys_par
+!IMPLICIT NONE
+!INTEGER,PARAMETER:: double=8
+!INTEGER,DIMENSION(2,3),PARAMETER::mat=(/1,2,3,4,5,6/)
+!REAL(KIND=double),PARAMETER::pi=3.1415
+!REAL(KIND=double),DIMENSION(2),PARAMETER::a2star=(/0.*5,pi/)
+!END MODULE sys_par
+
+PROGRAM MAIN
+!USE sys_par
+IMPLICIT NONE
+COMPLEX(KIND=8)::a
+INTEGER::i,j_value
+DO i=1,2
+ write(*,*) a2star 
+END DO
+END PROGRAM MAIN
+
+
+FUNCTION j_value(j)
+IMPLICIT NONE
+INTEGER::j_value
+INTEGER::j
+j_value=j
+END FUNCTION j_value
