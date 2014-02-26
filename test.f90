@@ -9,17 +9,8 @@
 PROGRAM MAIN
 !USE sys_par
 IMPLICIT NONE
-COMPLEX(KIND=8)::a
-INTEGER::i,j_value
-DO i=1,2
- write(*,*) a2star 
-END DO
+complex(KIND=8)::a
+ write(*,*) tiny(a) 
 END PROGRAM MAIN
 
 
-FUNCTION j_value(j)
-IMPLICIT NONE
-INTEGER::j_value
-INTEGER::j
-j_value=j
-END FUNCTION j_value

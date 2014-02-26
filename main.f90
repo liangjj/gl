@@ -6,18 +6,23 @@
 ! light will affect the phase diagram of this model. We will first use an effective model to represent
 ! the circular light. 
 !-----------------------------------------------------------------------------------------------------
+! AUTHOR:
+! Luming   |   hiluming@gmail.com
+!-----------------------------------------------------------------------------------------------------
 ! VERSION 1.0
 ! graphene negative hubbard U model, without sheding light on it.
 ! DATE:
 ! Thu Feb 20 14:15:37 CST 2014
 !-----------------------------------------------------------------------------------------------------
-! AUTHOR:
-! Luming   |   hiluming@gmail.com
-!-----------------------------------------------------------------------------------------------------
 ! VERSION 1.1
 ! add subroutine to self-consistent dertermine ef
 ! DATE:
 ! Wed Feb 26 11:07:41 CST 2014
+!-----------------------------------------------------------------------------------------------------
+! VERSION 1.2
+! add subroutine drawband. The above version doesn't work fine
+! DATE:
+! Wed Feb 26 22:32:33 CST 2014
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  
 MODULE sys_par
@@ -26,7 +31,7 @@ SAVE
 INTEGER,PARAMETER::n_lattice=100
 INTEGER,PARAMETER::n_site=n_lattice*n_lattice
 INTEGER,PARAMETER::double=8
-REAL(KIND=double),PARAMETER::eps=1.e-6
+REAL(KIND=double),PARAMETER::eps=1.e-5
 REAL(KIND=double),PARAMETER::eps1=1.e-4
 REAL(KIND=double),PARAMETER::pi=3.141592653
 REAL(KIND=double),DIMENSION(2,3),PARAMETER::delta=(/ 0.5*SQRT(3.),0.5,  -0.5*SQRT(3.),0.5,  0,-1. /)
@@ -38,18 +43,26 @@ END MODULE sys_par
 PROGRAM graphene_light
 USE sys_par
 IMPLICIT NONE
-REAL(KIND=double)::u_hub,m_lit,n_dope,delta_norm
+REAL(KIND=double)::u_hub,m_lit,n_dope,delta_norm,ef
 n_dope=0.
+u_hub=0
+m_lit=0
+ef=0
 OPEN(10,FILE="pd3")
-DO m_lit=0,1.01,0.05
-DO u_hub=3.,6.01,0.05
-  CALL meanfield(u_hub,n_dope,m_lit,delta_norm)
-  WRITE(10,"(3F10.5)")m_lit,u_hub,delta_norm
-  WRITE(*,"(3F10.5)")m_lit,u_hub,delta_norm
-END DO
-END DO
+!DO m_lit=0,1.01,0.1
+!DO u_hub=3.,6.01,0.1
+!  CALL meanfield(u_hub,n_dope,m_lit,delta_norm)
+  delta_norm=0
+  CALL drawband(u_hub,ef,m_lit,delta_norm)
+!  WRITE(10,"(3F10.5)")m_lit,u_hub,delta_norm
+!  WRITE(*,"(3F10.5)")m_lit,u_hub,delta_norm
+!END DO
+!END DO
 CLOSE(10)
 END PROGRAM graphene_light
+
+
+INCLUDE "drawband.f90"
 
 
 SUBROUTINE meanfield(u_hub,n_dope,m_lit,delta_norm)
@@ -58,12 +71,13 @@ IMPLICIT NONE
 REAL(KIND=double),INTENT(IN)::u_hub,n_dope,m_lit
 REAL(KIND=double),INTENT(OUT)::delta_norm
 REAL(KIND=double)::delta_norm1,ef
+delta_norm=0
 DO
 CALL findef(u_hub,n_dope,m_lit,delta_norm,ef)
 CALL findnext(u_hub,ef,m_lit,delta_norm,delta_norm1)
 IF(ABS(delta_norm-delta_norm1)<eps) EXIT
 delta_norm=delta_norm1                      !else, update delta_norm
-write(*,*) ef,delta_norm
+!write(*,*) ef,delta_norm
 END DO
 END SUBROUTINE meanfield
 
