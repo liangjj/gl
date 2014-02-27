@@ -9,8 +9,15 @@
 PROGRAM MAIN
 !USE sys_par
 IMPLICIT NONE
-complex(KIND=8)::a
- write(*,*) tiny(a) 
+integer,parameter::double=8
+REAL(KIND=8),parameter::pi=3.141592653
+!REAL(KIND=8),DIMENSION(2)::a,b
+COMPLEX(KIND=8)::x
+real(kind=8) a,b
+a=1
+b=1
+x=cmplx(a,b,double)
+ write(*,*)x
 END PROGRAM MAIN
 
 

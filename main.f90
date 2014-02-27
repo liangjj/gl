@@ -20,9 +20,15 @@
 ! Wed Feb 26 11:07:41 CST 2014
 !-----------------------------------------------------------------------------------------------------
 ! VERSION 1.2
-! add subroutine drawband. The above version doesn't work fine
+! add subroutine drawband. The above versions don't work fine
 ! DATE:
 ! Wed Feb 26 22:32:33 CST 2014
+!-----------------------------------------------------------------------------------------------------
+! VERSION 1.3
+! Using Nambu representation, to make the matrix 4*4, also figure out the main bug---that is ---
+! forget initialize the matrix. The bug is fixed. So this version works fine
+! DATE:
+! Wed Feb 26 11:07:41 CST 2014
 !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  
 MODULE sys_par
@@ -44,34 +50,31 @@ PROGRAM graphene_light
 USE sys_par
 IMPLICIT NONE
 REAL(KIND=double)::u_hub,m_lit,n_dope,delta_norm,ef
-n_dope=0.
-u_hub=0
+n_dope=0
+u_hub=2.1
 m_lit=0
-ef=0
-OPEN(10,FILE="pd3")
-!DO m_lit=0,1.01,0.1
-!DO u_hub=3.,6.01,0.1
-!  CALL meanfield(u_hub,n_dope,m_lit,delta_norm)
-  delta_norm=0
-  CALL drawband(u_hub,ef,m_lit,delta_norm)
-!  WRITE(10,"(3F10.5)")m_lit,u_hub,delta_norm
-!  WRITE(*,"(3F10.5)")m_lit,u_hub,delta_norm
-!END DO
-!END DO
+OPEN(10,FILE="pd")
+DO m_lit=0,1.01,0.05
+DO u_hub=0.,4.01,0.05
+  CALL meanfield(u_hub,n_dope,m_lit,delta_norm,ef)
+  WRITE(10,"(3F10.5)")m_lit,u_hub,delta_norm
+!  CALL drawband(ef,m_lit,delta_norm)
+  WRITE(*,"(4F10.5)")m_lit,u_hub,delta_norm,ef
+END DO
+END DO
 CLOSE(10)
 END PROGRAM graphene_light
 
 
-INCLUDE "drawband.f90"
 
 
-SUBROUTINE meanfield(u_hub,n_dope,m_lit,delta_norm)
+SUBROUTINE meanfield(u_hub,n_dope,m_lit,delta_norm,ef)
 USE sys_par
 IMPLICIT NONE
 REAL(KIND=double),INTENT(IN)::u_hub,n_dope,m_lit
-REAL(KIND=double),INTENT(OUT)::delta_norm
-REAL(KIND=double)::delta_norm1,ef
-delta_norm=0
+REAL(KIND=double),INTENT(OUT)::delta_norm,ef
+REAL(KIND=double)::delta_norm1
+delta_norm=0.3
 DO
 CALL findef(u_hub,n_dope,m_lit,delta_norm,ef)
 CALL findnext(u_hub,ef,m_lit,delta_norm,delta_norm1)
@@ -91,9 +94,9 @@ REAL(KIND=double),INTENT(IN)::u_hub,n_dope,m_lit,delta_norm
 REAL(KIND=double),INTENT(OUT)::ef
 REAL(KIND=double),DIMENSION(2)::k_vec
 REAL(KIND=double)::nab,upper,lower
-REAL(KIND=double),DIMENSION(8)::ek,nrk
+REAL(KIND=double),DIMENSION(4)::ek,nrk
 INTEGER::h1,h2,i,j
-COMPLEX(KIND=double),DIMENSION(8,8)::hk
+COMPLEX(KIND=double),DIMENSION(4,4)::hk
 nab=0
 ef=0
 upper=3
@@ -102,22 +105,19 @@ outmost:DO
 DO h1=1,n_lattice                              !calculate particle number
   DO h2=1,n_lattice
      k_vec=h1/REAL(n_lattice)*a1star+h2/REAL(n_lattice)*a2star
-     CALL writehk(u_hub,ef,m_lit,delta_norm,k_vec,hk)
+     CALL writehk(ef,m_lit,delta_norm,k_vec,hk)
      CALL heev(hk,ek,'V')
-     DO i=1,8
+     DO i=1,4
         IF(ek(i)>ef) THEN
            nrk(i)=0
         ELSE
            nrk(i)=1
         END IF
-		DO j=1,4
-        	nab=nab+CONJG(hk(j,i))*hk(j,i)*nrk(i)
-		END DO
+        nab=nab+CONJG(hk(1,i))*hk(1,i)*nrk(i)+CONJG(hk(2,i))*hk(2,i)*nrk(i)+CONJG(hk(3,i))*hk(3,i)*(1-nrk(i))+CONJG(hk(4,i))*hk(4,i)*(1-nrk(i))
      END DO
   END DO
 END DO
 nab=nab/REAL(n_site)
-
 IF(ABS(nab-2.-n_dope)<eps1) THEN 
 	EXIT outmost
 ELSE IF(nab<2+n_dope) THEN           !ef is too low 
@@ -139,23 +139,23 @@ IMPLICIT NONE
 REAL(KIND=double),INTENT(IN)::u_hub,ef,m_lit,delta_norm
 REAL(KIND=double),INTENT(OUT)::delta_norm1
 REAL(KIND=double),DIMENSION(2)::k_vec
-REAL(KIND=double),DIMENSION(8)::ek,nrk
+REAL(KIND=double),DIMENSION(4)::ek,nrk
 COMPLEX(KIND=double)::delta_a
 INTEGER::h1,h2,i
-COMPLEX(KIND=double),DIMENSION(8,8)::hk
+COMPLEX(KIND=double),DIMENSION(4,4)::hk
 delta_a=0
 DO h1=1,n_lattice
   DO h2=1,n_lattice
      k_vec=h1/REAL(n_lattice)*a1star+h2/REAL(n_lattice)*a2star
-     CALL writehk(u_hub,ef,m_lit,delta_norm,k_vec,hk)
+     CALL writehk(ef,m_lit,delta_norm,k_vec,hk)
      CALL heev(hk,ek,'V')
-     DO i=1,8
+     DO i=1,4
         IF(ek(i)>ef) THEN
            nrk(i)=0
         ELSE
            nrk(i)=1
         END IF
-        delta_a=delta_a+CONJG(hk(6,i))*hk(1,i)*nrk(i)
+        delta_a=delta_a+u_hub*CONJG(hk(3,i))*hk(1,i)*nrk(i)
      END DO
   END DO
 END DO
@@ -163,41 +163,40 @@ delta_norm1=ABS(delta_a)/REAL(n_site)
 END SUBROUTINE findnext
 
 
-SUBROUTINE writehk(u_hub,ef,m_lit,delta_norm,k_vec,hk)
+SUBROUTINE writehk(ef,m_lit,delta_norm,k_vec,hk)
 USE sys_par
 IMPLICIT NONE
-REAL(KIND=double),INTENT(IN)::u_hub,ef,m_lit,delta_norm
+REAL(KIND=double),INTENT(IN)::ef,m_lit,delta_norm
 REAL(KIND=double),DIMENSION(2),INTENT(IN)::k_vec
-COMPLEX(KIND=double),DIMENSION(8,8),INTENT(OUT)::hk
+COMPLEX(KIND=double),DIMENSION(4,4),INTENT(OUT)::hk
 COMPLEX(KIND=double)::tk
-REAL(KIND=double)::tk_re,tk_im,mk
+REAL(KIND=double)::tk_re,tk_im,mk,tmp
 INTEGER::i,j
 tk_re=0
 tk_im=0
+tk=0
 mk=0
 DO i=1,3
   mk=mk+2*m_lit/3./SQRT(3.)*SIN(DOT_PRODUCT(k_vec,d_vec(:,i)))
-  tk_re=tk_re+COS(DOT_PRODUCT(k_vec,delta(:,i)))
-  tk_im=tk_im+SIN(DOT_PRODUCT(k_vec,delta(:,i)))
+  tmp=DOT_PRODUCT(k_vec,delta(:,i))
+  tk_re=tk_re+COS(tmp)
+  tk_im=tk_im+SIN(tmp)
 END DO
 tk=CMPLX(tk_re,tk_im,double)
-DO i=1,2
- hk(i,i)=mk-ef
- hk(i+2,i+2)=-mk-ef
- hk(i+4,i+4)=mk+ef
- hk(i+6,i+6)=-mk+ef
- hk(i,i+2)=-tk
- hk(i+4,i+6)=tk
-END DO
-hk(2,5)=u_hub*delta_norm
-hk(1,6)=-u_hub*delta_norm
-hk(3:4,7:8)=hk(1:2,5:6)
-DO i=1,8
- DO j=1,8
-  IF(i<j) hk(j,i)=CONJG(hk(i,j))
- END DO
-END DO
-hk=0.5*hk
+ hk=0
+ hk(1,1)=mk-ef
+ hk(2,2)=-mk-ef
+ hk(3,3)=mk+ef
+ hk(4,4)=-mk+ef
+ hk(1,2)=-tk
+ hk(1,3)=-delta_norm
+ hk(2,4)=-delta_norm
+ hk(3,4)=tk
+ hk(2,1)=-CONJG(tk)
+ hk(3,1)=-delta_norm
+ hk(4,2)=-delta_norm
+ hk(4,3)=CONJG(tk)
 END SUBROUTINE writehk
 
 
+INCLUDE "drawband.f90"
