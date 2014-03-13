@@ -14,10 +14,13 @@ REAL(KIND=8),parameter::pi=3.141592653
 !REAL(KIND=8),DIMENSION(2)::a,b
 COMPLEX(KIND=8)::x
 real(kind=8) a,b
+real(kind=8),dimension(2):: wk(-1:1)
 a=1
 b=1
 x=cmplx(a,b,double)
- write(*,*)x
+wk(-1)=a^2
+wk(1)=b
+ write(*,*)wk
 END PROGRAM MAIN
 
 
