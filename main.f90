@@ -1,7 +1,7 @@
 MODULE sys_par
 IMPLICIT NONE
 SAVE
-INTEGER,PARAMETER::N=100
+INTEGER,PARAMETER::N=10000
 INTEGER,PARAMETER::NS=N*N
 INTEGER,PARAMETER::double=8
 REAL(KIND=double),PARAMETER::eps=1.e-5
@@ -16,90 +16,28 @@ END MODULE sys_par
 PROGRAM graphene_light
 USE sys_par
 IMPLICIT NONE
-REAL(KIND=double)::U,m,Ne,Ef
-REAL(KIND=double)::Delta
-Ne=0.1
-U=2.8
-m=0
-!OPEN(11,FILE="pd_0.5p")
-!DO m=0,1.01,0.05
-!DO U=2.,3.01,0.1
-  CALL meanfield(U,Ne,m,Delta,Ef)
-!  WRITE(10,"(3F10.5)")m,U,Delta
-  CALL drawband(Ef,m,Delta)
-  WRITE(*,"(4F10.5)")m,U,Delta,Ef
+REAL(KIND=double)::U,m,Ef
+REAL(KIND=double)::Delta,g
+!U=2.6
+!Ef=0.
+Delta=0.2
+OPEN(15,FILE="m_U_Delta02.txt")
+!DO m=0,0.61,0.05
+!DO U=2.,3.51,0.05
+!Delta=1.
+!  CALL findDelta(U,m,Ef,Delta)
+DO m=0.0,0.5,0.001
+  CALL  g_Delta(Delta,m,g)
+  WRITE(15,"(2F10.5)") m,Delta/g
+!  CALL drawband(Ef,m,Delta)
+  WRITE(*,*)"m,g",m,Delta/g
+END DO
 !END DO
-!END DO
-!CLOSE(11)
+CLOSE(15)
 END PROGRAM graphene_light
 
 
-SUBROUTINE meanfield(U,Ne,m,Delta,Ef)
-USE sys_par
-IMPLICIT NONE
-REAL(KIND=double),INTENT(IN)::U,Ne,m
-REAL(KIND=double),INTENT(OUT)::Ef,Delta
-REAL(KIND=double)::Delta1
-Delta1=0.5
-Ef=0.3
-DO
-CALL findef(U,Ne,m,Delta,Ef)
-CALL findDelta(U,Ef,m,Delta1)
-write(*,*)Delta1,Delta,Ef
-IF(ABS(Delta-Delta1)<eps) EXIT
-Delta=Delta1                      !else, update delta
-END DO
-END SUBROUTINE meanfield
-
-
-SUBROUTINE findEf(U,Ne,m,Delta,Ef)
-USE sys_par
-USE mkl95_lapack
-USE mkl95_precision
-IMPLICIT NONE
-REAL(KIND=double),INTENT(IN)::U,Ne,m,Delta
-REAL(KIND=double),INTENT(OUT)::Ef
-REAL(KIND=double),DIMENSION(2)::k
-REAL(KIND=double)::Nab,upper,lower
-REAL(KIND=double),DIMENSION(4)::Ek,nrk
-INTEGER::h1,h2,i,j
-COMPLEX(KIND=double),DIMENSION(4,4)::Hk
-upper=3
-lower=-3
-outmost:DO
-Nab=0
-DO h1=1,N                              !calculate particle number
-  DO h2=1,N
-     k=h1/REAL(N)*b1+h2/REAL(N)*b2
-     CALL writehk(Ef,m,Delta,k,Hk)
-     CALL heev(Hk,Ek,'V')
-     DO i=1,4
-        IF(Ek(i)>0) THEN !Bogoliubov quasi-particles fermi energy is 0
-           nrk(i)=0.
-        ELSE
-           nrk(i)=1.
-        END IF
-        Nab=Nab+ABS(hk(1,i))*ABS(hk(1,i))*nrk(i)+ABS(hk(2,i))*ABS(hk(2,i))*nrk(i)
-		Nab=Nab-ABS(hk(3,i))*ABS(hk(3,i))*nrk(i)-ABS(hk(4,i))*ABS(hk(4,i))*nrk(i)
-     END DO
-  END DO
-END DO
-Nab=Nab/REAL(Ns)
-write(*,*) "Nab,Ef,Delta",Nab,Ef,Delta
-IF(ABS(Nab-Ne)<eps1) THEN 
-	EXIT outmost
-ELSE IF(Nab<Ne) THEN           !ef is too low 
-	lower=ef
-    Ef=(Ef+upper)/2
-ELSE 
-	upper=Ef
-	Ef=(lower+Ef)/2
-END IF
-END DO outmost
-END SUBROUTINE findEf
-
-
-SUBROUTINE findDelta(U,Ef,m,Delta)
+SUBROUTINE findDelta(U,m,Ef,Delta)
 USE sys_par
 IMPLICIT NONE
 REAL(KIND=double),INTENT(IN)::U,Ef,m
@@ -117,15 +55,22 @@ DO h1=1,N
      k=h1/REAL(N)*b1+h2/REAL(N)*b2
      CALL writePar(m,k,Mk,tk)
 	 e2=Mk*Mk+ABS(tk)*ABS(tk)
-	 tmp=Mk*Mk/SQRT(e2*Ef*Ef+Mk*Mk*Delta*Delta)
+	 tmp=SQRT(e2*Ef*Ef+Mk*Mk*Delta*Delta)
      wk(1)=SQRT(e2+Ef*Ef+Delta*Delta-2*tmp)
      wk(2)=SQRT(e2+Ef*Ef+Delta*Delta+2*tmp)
+	 IF(m<eps) THEN
+	    tmp=0
+	 ELSE 
+	    tmp=Mk*Mk/SQRT(e2*Ef*Ef+Mk*Mk*Delta*Delta)
+		write(*,*) tmp
+	 END IF
      DO i=1,2
 	 tmp1=tmp1+(1+(2*i-3)*tmp)/wk(i)
      END DO
   END DO
 END DO
 tmp1=tmp1/REAL(4*Ns)
+!write(*,*)"tmp1,Delta",tmp1,Delta
 IF(ABS(Delta/U-Delta*tmp1)<eps) THEN 
 	EXIT outmost
 ELSE IF(tmp1>1/U) THEN           !the right handside is decress function of Delta 
@@ -137,6 +82,38 @@ ELSE
 END IF
 END DO outmost
 END SUBROUTINE findDelta
+
+
+SUBROUTINE findNe(U,m,Ef,Delta,Ne)
+USE sys_par
+USE mkl95_lapack
+USE mkl95_precision
+IMPLICIT NONE
+REAL(KIND=double),INTENT(IN)::U,Ef,m,Delta
+REAL(KIND=double),INTENT(OUT)::Ne
+REAL(KIND=double),DIMENSION(2)::k
+REAL(KIND=double),DIMENSION(4)::Ek,nrk
+INTEGER::h1,h2,i,j
+COMPLEX(KIND=double),DIMENSION(4,4)::Hk
+Ne=0
+DO h1=1,N                              !calculate particle number
+  DO h2=1,N
+     k=h1/REAL(N)*b1+h2/REAL(N)*b2
+     CALL writehk(Ef,m,Delta,k,Hk)
+     CALL heev(Hk,Ek,'V')
+     DO i=1,4
+        IF(Ek(i)>0) THEN !Bogoliubov quasi-particles fermi energy is 0
+           nrk(i)=0.
+        ELSE
+           nrk(i)=1.
+        END IF
+        Ne=Ne+ABS(hk(1,i))*ABS(hk(1,i))*nrk(i)+ABS(hk(2,i))*ABS(hk(2,i))*nrk(i)
+		Ne=Ne-ABS(hk(3,i))*ABS(hk(3,i))*nrk(i)-ABS(hk(4,i))*ABS(hk(4,i))*nrk(i)
+     END DO
+  END DO
+END DO
+Ne=Ne/REAL(Ns)
+END SUBROUTINE findNe
 
 
 SUBROUTINE writePar(m,k,Mk,tk)
@@ -190,8 +167,8 @@ END SUBROUTINE writehk
 
 INCLUDE "drawband.f90"
 INCLUDE "drawband1.f90"
-
-
+INCLUDE "f_Delta.f90"
+INCLUDE "g_Delta.f90"
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! DESCRIPTION:
 ! This program deal with "negative U Hubbard" model, with circular light shed on it. Originally, the  
@@ -237,4 +214,11 @@ INCLUDE "drawband1.f90"
 ! Change the qusiparticle "Fermi Energy" to zero
 ! DATE:
 ! Thu Mar 13 21:48:08 CST 2014
-!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!-----------------------------------------------------------------------------------------------------
+! VERSION 1.6
+! Add g_Delta.f90 and f_Delta.f90. Which are the function to obtain U using delta, half-filled and doped
+! respectively. Another trick is to use the Delta limits to 0 instead of setting Delta to 0 directly. 
+! This avoid the divergent problem. 
+! DATE:
+! Tue Mar 18 19:24:13 CST 2014
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
