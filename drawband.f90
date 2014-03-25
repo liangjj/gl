@@ -4,7 +4,7 @@ USE mkl95_lapack
 USE mkl95_precision
 IMPLICIT NONE
 REAL(KIND=double),INTENT(IN)::Ef,m
-COMPLEX(KIND=double),INTENT(IN)::Delta
+REAL(KIND=double),INTENT(IN)::Delta
 REAL(KIND=double),DIMENSION(2)::k
 COMPLEX(KIND=double),DIMENSION(4,4)::Hk
 REAL(double)::cyclelimit,x,kx,ky

@@ -6,7 +6,7 @@ REAL(KIND=double),INTENT(OUT)::g
 REAL(KIND=double),DIMENSION(2)::k,wk
 REAL(KIND=double)::Mk,e2,tmp
 COMPLEX(KIND=double)::tk
-INTEGER::h1,h2,i
+INTEGER(KIND=double)::h1,h2,i
 g=0
 DO h1=1,N
   DO h2=1,N
@@ -17,9 +17,8 @@ DO h1=1,N
 	 tmp=SQRT(e2*Ef*Ef+Mk*Mk*Delta*Delta)
      wk(1)=SQRT(e2+Delta*Delta+Ef*Ef-2*tmp)
      wk(2)=SQRT(e2+Delta*Delta+Ef*Ef+2*tmp)
-	 
 	 DO i=1,2
-	 g=g+(Delta+(2*i-3)*Mk*Mk/tmp)/wk(i)
+	 g=(1.+(2*i-3)*Mk*Mk/tmp)/wk(i)+g
      END DO
   END DO
 END DO

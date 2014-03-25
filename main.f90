@@ -1,12 +1,12 @@
 MODULE sys_par
 IMPLICIT NONE
 SAVE
-INTEGER,PARAMETER::N=10000
-INTEGER,PARAMETER::NS=N*N
 INTEGER,PARAMETER::double=8
+INTEGER(KIND=DOUBLE),PARAMETER::N=1000
+INTEGER(KIND=DOUBLE),PARAMETER::NS=N*N
 REAL(KIND=double),PARAMETER::eps=1.e-5
 REAL(KIND=double),PARAMETER::eps1=5.e-5
-REAL(KIND=double),PARAMETER::Pi=3.141592653
+REAL(KIND=double),PARAMETER::Pi=3.141592653589793238462643383279502884197169399
 REAL(KIND=double),DIMENSION(2,3),PARAMETER::a=(/ 0.5*SQRT(3.),0.5,  -0.5*SQRT(3.),0.5,  0,-1. /)
 REAL(KIND=double),DIMENSION(2),PARAMETER::b1=(/ 2*pi/SQRT(3.),-2*pi/3. /) !reciprotical vector
 REAL(KIND=double),DIMENSION(2),PARAMETER::b2=(/ 0.*pi,4*pi/3. /)           
@@ -16,72 +16,29 @@ END MODULE sys_par
 PROGRAM graphene_light
 USE sys_par
 IMPLICIT NONE
-REAL(KIND=double)::U,m,Ef
-REAL(KIND=double)::Delta,g
-!U=2.6
-!Ef=0.
-Delta=0.2
-OPEN(15,FILE="m_U_Delta02.txt")
-!DO m=0,0.61,0.05
-!DO U=2.,3.51,0.05
-!Delta=1.
-!  CALL findDelta(U,m,Ef,Delta)
-DO m=0.0,0.5,0.001
-  CALL  g_Delta(Delta,m,g)
-  WRITE(15,"(2F10.5)") m,Delta/g
-!  CALL drawband(Ef,m,Delta)
-  WRITE(*,*)"m,g",m,Delta/g
+REAL(KIND=double)::m,Ef
+REAL(KIND=double)::Delta,g,Ne
+Ne=0.02
+m=0.04
+!CALL ne_mu(m,Ef,Delta)
+!CALL drawband(Ef,m,Delta)
+OPEN(15,FILE="m_0.txt")
+DO Delta=0.00001,0.001,0.0001
+  CALL findEf_Newton(m,Delta,Ne,Ef)
+  CALL f_Delta(Delta,m,Ef,g)
+  WRITE(15,"(2F10.5)") 1./g,Delta
+  WRITE(*,*)"U,Delta,Ne=0.2,m=0.04",1./g,Delta
 END DO
-!END DO
+
+DO Delta=0.001,0.1,0.001
+  CALL findEf_Newton(m,Delta,Ne,Ef)
+  CALL f_Delta(Delta,m,Ef,g)
+  WRITE(15,"(2F10.5)") 1./g,Delta
+  WRITE(*,*)"U,Delta,Ne=0.2,m=0.04",1./g,Delta
+END DO
+
 CLOSE(15)
 END PROGRAM graphene_light
-
-
-SUBROUTINE findDelta(U,m,Ef,Delta)
-USE sys_par
-IMPLICIT NONE
-REAL(KIND=double),INTENT(IN)::U,Ef,m
-REAL(KIND=double),INTENT(OUT)::Delta
-REAL(KIND=double),DIMENSION(2)::k,wk
-REAL(KIND=double)::Mk,tmp,tmp1,upper,lower,e2
-COMPLEX(KIND=double)::tk
-INTEGER::h1,h2,i
-upper=3
-lower=0
-outmost: DO
-tmp1=0
-DO h1=1,N
-  DO h2=1,N
-     k=h1/REAL(N)*b1+h2/REAL(N)*b2
-     CALL writePar(m,k,Mk,tk)
-	 e2=Mk*Mk+ABS(tk)*ABS(tk)
-	 tmp=SQRT(e2*Ef*Ef+Mk*Mk*Delta*Delta)
-     wk(1)=SQRT(e2+Ef*Ef+Delta*Delta-2*tmp)
-     wk(2)=SQRT(e2+Ef*Ef+Delta*Delta+2*tmp)
-	 IF(m<eps) THEN
-	    tmp=0
-	 ELSE 
-	    tmp=Mk*Mk/SQRT(e2*Ef*Ef+Mk*Mk*Delta*Delta)
-		write(*,*) tmp
-	 END IF
-     DO i=1,2
-	 tmp1=tmp1+(1+(2*i-3)*tmp)/wk(i)
-     END DO
-  END DO
-END DO
-tmp1=tmp1/REAL(4*Ns)
-!write(*,*)"tmp1,Delta",tmp1,Delta
-IF(ABS(Delta/U-Delta*tmp1)<eps) THEN 
-	EXIT outmost
-ELSE IF(tmp1>1/U) THEN           !the right handside is decress function of Delta 
-	lower=Delta
-    Delta=(Delta+upper)/2
-ELSE 
-	upper=Delta
-	Delta=(lower+Delta)/2
-END IF
-END DO outmost
-END SUBROUTINE findDelta
 
 
 SUBROUTINE findNe(U,m,Ef,Delta,Ne)
@@ -143,7 +100,7 @@ SUBROUTINE writehk(Ef,m,Delta,k,Hk)
 USE sys_par
 IMPLICIT NONE
 REAL(KIND=double),INTENT(IN)::Ef,m
-COMPLEX(KIND=double),INTENT(IN)::Delta
+REAL(KIND=double),INTENT(IN)::Delta
 REAL(KIND=double),DIMENSION(2),INTENT(IN)::k
 COMPLEX(KIND=double),DIMENSION(4,4),INTENT(OUT)::Hk
 COMPLEX(KIND=double)::tk
@@ -165,10 +122,60 @@ CALL writePar(m,k,Mk,tk)
 END SUBROUTINE writehk
 
 
-INCLUDE "drawband.f90"
-INCLUDE "drawband1.f90"
-INCLUDE "f_Delta.f90"
-INCLUDE "g_Delta.f90"
+INCLUDE "drawband.f90"   !draw band around BZ boundary
+INCLUDE "drawband1.f90"  !draw the full band, 3D
+INCLUDE "f_Delta.f90"    !calculate mu!=0 delta vs U,with and without m
+INCLUDE "g_Delta.f90"    !calculate mu=0 delta vs U, with and without m
+INCLUDE "ne_mu.f90"      !find Ne vs mu with no interaction
+INCLUDE "findEf.f90"     !find Ef self consistantly with interaction 
+INCLUDE "findEf_Newton.f90"     !find Ef self consistantly with interaction using Newton method
+
+SUBROUTINE findDelta(U,m,Ef,Delta)
+USE sys_par
+IMPLICIT NONE
+REAL(KIND=double),INTENT(IN)::U,Ef,m
+REAL(KIND=double),INTENT(OUT)::Delta
+REAL(KIND=double),DIMENSION(2)::k,wk
+REAL(KIND=double)::Mk,tmp,tmp1,upper,lower,e2
+COMPLEX(KIND=double)::tk
+INTEGER::h1,h2,i
+upper=3
+lower=0
+outmost: DO
+tmp1=0
+DO h1=1,N
+  DO h2=1,N
+     k=h1/REAL(N)*b1+h2/REAL(N)*b2
+     CALL writePar(m,k,Mk,tk)
+	 e2=Mk*Mk+ABS(tk)*ABS(tk)
+	 tmp=SQRT(e2*Ef*Ef+Mk*Mk*Delta*Delta)
+     wk(1)=SQRT(e2+Ef*Ef+Delta*Delta-2*tmp)
+     wk(2)=SQRT(e2+Ef*Ef+Delta*Delta+2*tmp)
+	 IF(m<eps) THEN
+	    tmp=0
+	 ELSE 
+	    tmp=Mk*Mk/SQRT(e2*Ef*Ef+Mk*Mk*Delta*Delta)
+		write(*,*) tmp
+	 END IF
+     DO i=1,2
+	 tmp1=tmp1+(1+(2*i-3)*tmp)/wk(i)
+     END DO
+  END DO
+END DO
+tmp1=tmp1/REAL(4*Ns)
+!write(*,*)"tmp1,Delta",tmp1,Delta
+IF(ABS(Delta/U-Delta*tmp1)<eps) THEN 
+	EXIT outmost
+ELSE IF(tmp1>1/U) THEN           !the right handside is decress function of Delta 
+	lower=Delta
+    Delta=(Delta+upper)/2
+ELSE 
+	upper=Delta
+	Delta=(lower+Delta)/2
+END IF
+END DO outmost
+END SUBROUTINE findDelta
+
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ! DESCRIPTION:
 ! This program deal with "negative U Hubbard" model, with circular light shed on it. Originally, the  
@@ -221,4 +228,11 @@ INCLUDE "g_Delta.f90"
 ! This avoid the divergent problem. 
 ! DATE:
 ! Tue Mar 18 19:24:13 CST 2014
+!-----------------------------------------------------------------------------------------------------
+! VERSION 1.7
+! Add findEf.f90 and findEf_Newton.f90 to find Ef with a given Ne selfconsistently. Also add a simple 
+! program ne_mu to find the relation bewteen Ne and Mu without interaction. Change two places that 
+! wrongly define Delta as a complex number.
+! DATE:
+!Tue Mar 25 22:16:09 CST 2014
 !++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
